@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <exclude domain="database" path="midtown_pos_db" />
+    <exclude domain="database" path="midtown_pos_db-wal" />
+    <exclude domain="database" path="midtown_pos_db-shm" />
+    <exclude domain="sharedpref" path="." />
+</full-backup-content>
