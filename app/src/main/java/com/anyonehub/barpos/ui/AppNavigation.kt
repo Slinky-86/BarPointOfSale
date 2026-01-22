@@ -43,7 +43,7 @@ fun BarPosNavHost(
     // UI State for Drawer
     val currentUser by posViewModel.currentUser.collectAsState()
     
-    // Determine if drawer should be active (only on POS and Settings screens usually)
+    // Determine if drawer should be active
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val isDrawerEnabled = currentRoute == "pos"
@@ -81,8 +81,8 @@ fun BarPosNavHost(
                         onClick = { scope.launch { drawerState.close() }; navController.navigate("zreport") }
                     )
                     NavigationDrawerItem(
-                        label = { Text("Tip Tracker") },
-                        icon = { Icon(painterResource(id = R.drawable.ic_tip_tracker_3d), null, Modifier.size(24.dp), tint = Color.Unspecified) },
+                        label = { Text("My Profile & Tips") },
+                        icon = { Icon(painterResource(id = R.drawable.ic_user_profile_3d), null, Modifier.size(24.dp), tint = Color.Unspecified) },
                         selected = false,
                         onClick = { scope.launch { drawerState.close() }; navController.navigate("stats") }
                     )

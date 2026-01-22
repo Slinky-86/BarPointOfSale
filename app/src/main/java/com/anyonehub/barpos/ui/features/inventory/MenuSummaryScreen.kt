@@ -216,20 +216,8 @@ fun MenuSummaryScreen(
                 itemToEdit?.let { viewModel.deleteMenuItem(it.id) }
                 showEditDialog = false
             },
-            onConfirm = { n, p, s, st, d, i, hp, bp, hhb ->
-                viewModel.saveMenuItem(
-                    id = itemToEdit?.id,
-                    categoryId = itemToEdit?.categoryId ?: 1,
-                    name = n,
-                    price = p,
-                    isShot = s,
-                    stock = st,
-                    description = d,
-                    iconName = i,
-                    hhPrice = hp,
-                    bucketPrice = bp,
-                    hhBucketPrice = hhb
-                )
+            onConfirm = { updatedItem ->
+                viewModel.saveMenuItem(updatedItem)
                 showEditDialog = false
             }
         )

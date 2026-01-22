@@ -21,16 +21,17 @@ import kotlin.time.Instant
 import kotlin.time.ExperimentalTime
 
 @Composable
-fun CashPaymentDialog(
+fun SettlementDialog(
     customerName: String,
     totalDue: Double,
     onDismiss: () -> Unit,
-    onConfirmPay: () -> Unit
+    onConfirmPay: (String) -> Unit
 ) {
+    var paymentType by remember { mutableStateOf("CASH") }
     var tenderedStr by remember { mutableStateOf("") }
     val tendered = tenderedStr.toDoubleOrNull() ?: 0.0
     val changeDue = tendered - totalDue
-    val isSufficient = tendered >= totalDue
+    val isSufficient = tendered >= totalDue || paymentType == "CARD"
 
     // Quick denomination buttons helper
     val addBill = { amount: Int ->
@@ -57,102 +58,129 @@ fun CashPaymentDialog(
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
-                // --- TENDERED INPUT ---
-                OutlinedTextField(
-                    value = tenderedStr,
-                    onValueChange = { if (it.all { char -> char.isDigit() || char == '.' }) tenderedStr = it },
-                    label = { Text("Cash Tendered") },
-                    prefix = { Text("$") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
-                // --- QUICK CASH BUTTONS ---
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    val bills = listOf(1, 5, 10, 20)
-                    bills.forEach { bill ->
-                        Button(
-                            onClick = { addBill(bill) },
-                            contentPadding = PaddingValues(0.dp),
-                            modifier = Modifier.weight(1f).padding(horizontal = 2.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-                        ) {
-                            Text("$$bill", fontSize = 12.sp)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    val bills = listOf(50, 100)
-                    bills.forEach { bill ->
-                        Button(
-                            onClick = { addBill(bill) },
-                            modifier = Modifier.weight(1f).padding(horizontal = 2.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-                        ) {
-                            Text("$$bill")
-                        }
-                    }
-                    // Exact Change Button
+                // --- PAYMENT TYPE SELECTION ---
+                Text("Select Payment Method:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
-                        onClick = { tenderedStr = totalDue.toString() },
-                        modifier = Modifier.weight(2f).padding(horizontal = 2.dp),
+                        onClick = { paymentType = "CASH" },
+                        modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = MaterialTheme.colorScheme.onSurface
+                            containerColor = if (paymentType == "CASH") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = if (paymentType == "CASH") Color.White else MaterialTheme.colorScheme.onSurface
                         )
+                    ) { Text("CASH") }
+                    
+                    Button(
+                        onClick = { paymentType = "CARD" },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (paymentType == "CARD") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = if (paymentType == "CARD") Color.White else MaterialTheme.colorScheme.onSurface
+                        )
+                    ) { Text("CARD") }
+                }
+
+                if (paymentType == "CASH") {
+                    // --- TENDERED INPUT ---
+                    OutlinedTextField(
+                        value = tenderedStr,
+                        onValueChange = { if (it.all { char -> char.isDigit() || char == '.' }) tenderedStr = it },
+                        label = { Text("Cash Tendered") },
+                        prefix = { Text("$") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    // --- QUICK CASH BUTTONS ---
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Exact")
+                        val bills = listOf(1, 5, 10, 20)
+                        bills.forEach { bill ->
+                            Button(
+                                onClick = { addBill(bill) },
+                                contentPadding = PaddingValues(0.dp),
+                                modifier = Modifier.weight(1f).padding(horizontal = 2.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                            ) {
+                                Text("$$bill", fontSize = 12.sp)
+                            }
+                        }
                     }
-                }
 
-                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                // --- CHANGE DISPLAY ---
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("CHANGE DUE:", fontWeight = FontWeight.Bold)
-                    Text(
-                        text = if (isSufficient) String.format(Locale.US, "$%.2f", changeDue) else "---",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isSufficient) MaterialTheme.colorScheme.primary else Color.Gray
-                    )
-                }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        val bills = listOf(50, 100)
+                        bills.forEach { bill ->
+                            Button(
+                                onClick = { addBill(bill) },
+                                modifier = Modifier.weight(1f).padding(horizontal = 2.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                            ) {
+                                Text("$$bill")
+                            }
+                        }
+                        // Exact Change Button
+                        Button(
+                            onClick = { tenderedStr = totalDue.toString() },
+                            modifier = Modifier.weight(2f).padding(horizontal = 2.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.onSurface
+                            )
+                        ) {
+                            Text("Exact")
+                        }
+                    }
 
-                if (!isSufficient && tendered > 0) {
-                    Text(
-                        text = "Insufficient Funds",
-                        color = MaterialTheme.colorScheme.error,
-                        fontSize = 12.sp,
-                        modifier = Modifier.align(Alignment.End)
-                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+                    // --- CHANGE DISPLAY ---
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("CHANGE DUE:", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = if (isSufficient) String.format(Locale.US, "$%.2f", changeDue) else "---",
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isSufficient) MaterialTheme.colorScheme.primary else Color.Gray
+                        )
+                    }
+
+                    if (!isSufficient && tendered > 0) {
+                        Text(
+                            text = "Insufficient Funds",
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 12.sp,
+                            modifier = Modifier.align(Alignment.End)
+                        )
+                    }
+                } else {
+                    Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                        Text("Confirm processing total on external card reader.", textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    }
                 }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    // High-Precision Payment Audit
                     val paymentTime: Instant = Clock.System.now()
-                    Log.d("FinancialDialogs", "Cash payment finalized at $paymentTime")
-                    onConfirmPay()
+                    Log.d("FinancialDialogs", "Payment finalized as $paymentType at $paymentTime")
+                    onConfirmPay(paymentType)
                 },
                 enabled = isSufficient,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("FINALIZE SALE", fontWeight = FontWeight.Bold)

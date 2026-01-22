@@ -70,17 +70,19 @@ object PricingEngine {
     /**
      * Calculates the final totals for a transaction using the Python finance engine
      * for high-precision Money-based math.
+     * Updated: Respects the isFood flag for selective taxation.
      */
-    fun calculateFullTransaction(itemPricesAndQtys: List<Pair<Double, Int>>, settings: AppSetting?): TransactionResult {
+    fun calculateFullTransaction(itemsData: List<Triple<Double, Int, Boolean>>, settings: AppSetting?): TransactionResult {
         return try {
             val py = Python.getInstance()
             val module = py.getModule("finance_engine")
 
             val itemsArray = JSONArray()
-            itemPricesAndQtys.forEach { (price, qty) ->
+            itemsData.forEach { (price, qty, isFood) ->
                 itemsArray.put(JSONObject().apply {
                     put("price", price)
                     put("qty", qty)
+                    put("is_food", isFood)
                 })
             }
 
@@ -100,8 +102,9 @@ object PricingEngine {
         } catch (e: Exception) {
             Log.e(TAG, "Transaction Calculation Failed: ${e.message}")
             // Local fallback if Python fails
-            val subtotal = itemPricesAndQtys.sumOf { it.first * it.second }
-            val tax = calculateTax(subtotal, settings?.taxRate ?: 0.08)
+            val subtotal = itemsData.sumOf { it.first * it.second }
+            val taxableSubtotal = itemsData.filter { it.third }.sumOf { it.first * it.second }
+            val tax = calculateTax(taxableSubtotal, settings?.taxRate ?: 0.08)
             TransactionResult(subtotal, tax, subtotal + tax, String.format(Locale.US, "$%.2f", subtotal + tax))
         }
     }

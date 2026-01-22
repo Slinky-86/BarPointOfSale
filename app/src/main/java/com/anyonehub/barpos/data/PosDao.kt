@@ -14,9 +14,6 @@ interface PosDao {
     @Query("SELECT * FROM users WHERE name = :name AND pin_code = :pin AND is_active = 1 LIMIT 1")
     suspend fun loginUser(name: String, pin: String): User?
 
-    @Query("SELECT * FROM users WHERE pin_code = :pin LIMIT 1")
-    suspend fun getUserByPin(pin: String): User?
-
     @Query("SELECT * FROM users WHERE supabase_id = :supabaseId LIMIT 1")
     suspend fun getUserBySupabaseId(supabaseId: String): User?
 
@@ -52,53 +49,22 @@ interface PosDao {
     fun getAllMenuGroups(): Flow<List<MenuGroup>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertMenuGroup(group: MenuGroup)
-
-    @Query("DELETE FROM menu_groups WHERE id = :groupId")
-    suspend fun deleteMenuGroup(groupId: Int)
-
-    @Query("SELECT * FROM categories WHERE menu_group_id = :groupId ORDER BY display_order ASC")
-    fun getCategoriesByGroup(groupId: Int): Flow<List<Category>>
+    suspend fun insertMenuGroup(group: MenuGroup): Long
 
     @Query("SELECT * FROM categories ORDER BY name ASC")
     fun getAllCategoriesRaw(): Flow<List<Category>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertCategory(category: Category)
-
-    @Query("DELETE FROM categories WHERE id = :categoryId")
-    suspend fun deleteCategory(categoryId: Int)
+    suspend fun insertCategory(category: Category): Long
 
     @Query("SELECT * FROM menu_items WHERE is_active = 1 ORDER BY category_id ASC, name ASC")
     fun getAllMenuItems(): Flow<List<MenuItem>>
-
-    @Query("SELECT * FROM menu_items WHERE category_id = :categoryId AND is_active = 1 ORDER BY name ASC")
-    fun getItemsByCategory(categoryId: Int): Flow<List<MenuItem>>
 
     @Query("SELECT * FROM menu_items WHERE is_shot_wall_item = 1 AND is_active = 1 ORDER BY name ASC")
     fun getShotWallItems(): Flow<List<MenuItem>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMenuItem(item: MenuItem)
-
-    @Query("""
-        UPDATE menu_items 
-        SET name = :name, price = :price, is_shot_wall_item = :isShot, 
-            inventory_count = :stock, description = :description,
-            hh_price = :hhPrice, bucket_price = :bucketPrice, hh_bucket_price = :hhBucketPrice
-        WHERE id = :id
-    """)
-    suspend fun updateMenuItem(
-        id: Int,
-        name: String,
-        price: Double,
-        isShot: Boolean,
-        stock: Int,
-        description: String,
-        hhPrice: Double?,
-        bucketPrice: Double?,
-        hhBucketPrice: Double?
-    )
 
     @Query("UPDATE menu_items SET inventory_count = :count WHERE id = :itemId")
     suspend fun restockItem(itemId: Int, count: Int)
@@ -125,9 +91,6 @@ interface PosDao {
 
     @Query("SELECT * FROM active_tabs WHERE is_open = 1 ORDER BY created_at DESC")
     fun getOpenTabs(): Flow<List<ActiveTab>>
-
-    @Query("SELECT * FROM active_tabs WHERE is_open = 1 AND server_id = :serverId ORDER BY created_at DESC")
-    fun getOpenTabsForServer(serverId: Int): Flow<List<ActiveTab>>
 
     @Query("SELECT * FROM active_tabs WHERE is_open = 0 ORDER BY created_at DESC")
     fun getClosedTabs(): Flow<List<ActiveTab>>
@@ -166,9 +129,6 @@ interface PosDao {
     """)
     fun getTabDetails(tabId: Long): Flow<Map<TabItem, MenuItem>>
 
-    @Query("SELECT IFNULL(SUM(price_at_time_of_sale), 0.0) FROM tab_items WHERE tab_id = :tabId")
-    fun getTabTotal(tabId: Long): Flow<Double>
-
     @RewriteQueriesToDropUnusedColumns
     @Query("""
         SELECT IFNULL(SUM(price_at_time_of_sale), 0.0) 
@@ -186,4 +146,7 @@ interface PosDao {
 
     @Query("DELETE FROM active_tabs WHERE is_open = 0")
     suspend fun clearSalesHistory()
+
+    @Query("SELECT * FROM customers WHERE name LIKE :query")
+    fun searchCustomers(query: String): Flow<List<Customer>>
 }

@@ -72,7 +72,7 @@ import com.anyonehub.barpos.ui.features.inventory.AddEditItemDialog
 import com.anyonehub.barpos.ui.features.inventory.AddMenuGroupDialog
 import com.anyonehub.barpos.ui.features.inventory.RestockDialog
 import com.anyonehub.barpos.ui.shared.TutorialOverlay
-import com.anyonehub.barpos.ui.shared.dialogs.CashPaymentDialog
+import com.anyonehub.barpos.ui.shared.dialogs.SettlementDialog
 import com.anyonehub.barpos.ui.shared.dialogs.EditLineItemPriceDialog
 import com.anyonehub.barpos.ui.shared.dialogs.LineItemActionDialog
 import com.anyonehub.barpos.ui.shared.dialogs.TabSelectionDialog
@@ -135,10 +135,11 @@ fun MainPosScreen(
     var showAddCategoryDialog by remember { mutableStateOf(false) }
     var itemToEdit by remember { mutableStateOf<MenuItem?>(null) }
     var itemToSelectPricing by remember { mutableStateOf<MenuItem?>(null) }
+    var itemToBuild by remember { mutableStateOf<MenuItem?>(null) }
     var itemToRestock by remember { mutableStateOf<MenuItem?>(null) }
     var showManualTutorial by remember { mutableStateOf(false) }
 
-    // TRACK SESSION START TIME (Uses kotlin.time.Instant and kotlin.time.Clock)
+    // TRACK SESSION START TIME
     val sessionStartTime: Instant = remember { Clock.System.now() }
 
     // FLASH ICON STATE
@@ -207,7 +208,6 @@ fun MainPosScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { 
-                    // SECURITY CHECK: Only Admin or Manager can enter edit mode
                     if (currentUser?.role == UserRole.ADMIN || currentUser?.role == UserRole.MANAGER) {
                         viewModel.toggleEditMode() 
                     } else {
@@ -228,7 +228,6 @@ fun MainPosScreen(
         }
     ) { padding ->
         if (isPortrait) {
-            // PORTRAIT: STACK VERTICALLY
             Column(modifier = Modifier.padding(padding).fillMaxSize()) {
                 Box(modifier = Modifier.weight(1f)) {
                     MenuLayout(
@@ -243,7 +242,18 @@ fun MainPosScreen(
                         openTabs = openTabs,
                         currentTabId = currentTabId,
                         viewModel = viewModel,
-                        onItemClick = { if (isEditMode) itemToEdit = it else itemToSelectPricing = it },
+                        onItemClick = { item ->
+                            if (isEditMode) {
+                                itemToEdit = item 
+                            } else {
+                                val category = allCategories.find { it.id == item.categoryId }
+                                if (category?.requiresBuilder == true) {
+                                    itemToBuild = item
+                                } else {
+                                    itemToSelectPricing = item
+                                }
+                            }
+                        },
                         onTabDialog = { showTabDialog = true }
                     )
                 }
@@ -267,7 +277,6 @@ fun MainPosScreen(
                         onClick = { isTabPanelVisible = true },
                         modifier = Modifier.fillMaxWidth().padding(8.dp)
                     ) {
-                        // Display Session Duration (Uses kotlin.time.Instant and kotlin.time.Clock)
                         val now = Clock.System.now()
                         val duration: Duration = now - sessionStartTime
                         val mins = duration.inWholeMinutes
@@ -276,7 +285,6 @@ fun MainPosScreen(
                 }
             }
         } else {
-            // LANDSCAPE: SIDE-BY-SIDE
             Row(modifier = Modifier.padding(padding).fillMaxSize()) {
                 Column(modifier = Modifier.weight(1f)) {
                     MenuLayout(
@@ -291,7 +299,18 @@ fun MainPosScreen(
                         openTabs = openTabs,
                         currentTabId = currentTabId,
                         viewModel = viewModel,
-                        onItemClick = { if (isEditMode) itemToEdit = it else itemToSelectPricing = it },
+                        onItemClick = { item ->
+                            if (isEditMode) {
+                                itemToEdit = item 
+                            } else {
+                                val category = allCategories.find { it.id == item.categoryId }
+                                if (category?.requiresBuilder == true) {
+                                    itemToBuild = item
+                                } else {
+                                    itemToSelectPricing = item
+                                }
+                            }
+                        },
                         onTabDialog = { showTabDialog = true }
                     )
                 }
@@ -338,23 +357,53 @@ fun MainPosScreen(
     itemToSelectPricing?.let { item ->
         ItemPricingDialog(item = item, onDismiss = { itemToSelectPricing = null }, onSelectPrice = { price, label -> viewModel.addToTab(item, overridePrice = price, label = label); itemToSelectPricing = null })
     }
+    itemToBuild?.let { item ->
+        val allMenuItems by viewModel.allMenuItems.collectAsState()
+        val modifiers = allMenuItems.filter { it.categoryId == item.categoryId && it.isModifier }
+        ModifierSelectionDialog(
+            mainItem = item,
+            modifiers = modifiers,
+            onDismiss = { itemToBuild = null },
+            onComplete = { note ->
+                viewModel.addToTab(item, label = note)
+                itemToBuild = null
+            }
+        )
+    }
     itemToEdit?.let { item ->
-        AddEditItemDialog(existingItem = item, onDismiss = { itemToEdit = null }, onDelete = { viewModel.deleteMenuItem(item.id); itemToEdit = null }, onConfirm = { n, p, s, q, d, i, hp, bp, hbp -> viewModel.saveMenuItem(item.copy(name = n, price = p, isShotWallItem = s, inventoryCount = q, description = d, iconName = i, hhPrice = hp, bucketPrice = bp, hhBucketPrice = hbp)); itemToEdit = null })
+        AddEditItemDialog(
+            existingItem = item, 
+            onDismiss = { itemToEdit = null }, 
+            onDelete = { viewModel.deleteMenuItem(item.id); itemToEdit = null }, 
+            onConfirm = { updatedItem -> 
+                viewModel.saveMenuItem(updatedItem)
+                itemToEdit = null 
+            }
+        )
     }
     itemToRestock?.let { item ->
         RestockDialog(item = item, onDismiss = { itemToRestock = null }, onConfirm = { count -> viewModel.restockItem(item.id, count); itemToRestock = null })
     }
+    
     if (showAddGroupDialog) { AddMenuGroupDialog(onDismiss = { showAddGroupDialog = false }, onConfirm = { name -> viewModel.addMenuGroup(name); showAddGroupDialog = false }) }
-    if (showAddCategoryDialog) { AddCategoryDialog(onDismiss = { showAddCategoryDialog = false }, onConfirm = { name, icon -> selectedGroup?.let { viewModel.addCategory(it.id.toLong(), name, icon) }; showAddCategoryDialog = false }) }
+    if (showAddCategoryDialog) { 
+        AddCategoryDialog(
+            onDismiss = { showAddCategoryDialog = false }, 
+            onConfirm = { name, icon, requiresBuilder -> 
+                selectedGroup?.let { viewModel.addCategory(it.id.toLong(), name, icon, requiresBuilder) } 
+                showAddCategoryDialog = false 
+            }
+        ) 
+    }
     if (showTabDialog) { TabSelectionDialog(openTabs = openTabs, currentTabId = currentTabId, onDismiss = { showTabDialog = false }, onTabSelected = { id -> viewModel.switchTab(id); showTabDialog = false }, onCreateNew = { name -> viewModel.createNewTab(name); showTabDialog = false }, onRenameTab = { id, name -> viewModel.renameTab(id, name) }, posViewModel = viewModel) }
     
     currentTab?.let { activeTab ->
         if (showPaymentDialog) {
-            CashPaymentDialog(
+            SettlementDialog(
                 customerName = activeTab.customerName, 
                 totalDue = total, 
                 onDismiss = { showPaymentDialog = false }, 
-                onConfirmPay = { 
+                onConfirmPay = { type ->
                     scope.launch { 
                         ReceiptManager.generateAndShareReceipt(
                             context = context, 
@@ -363,7 +412,7 @@ fun MainPosScreen(
                             total = total, 
                             supabaseStorage = viewModel.supabaseStorage
                         ) 
-                        viewModel.closeTab() 
+                        viewModel.closeTab(paymentType = type)
                         showPaymentDialog = false 
                     } 
                 }

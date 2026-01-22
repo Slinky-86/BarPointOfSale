@@ -53,42 +53,16 @@ class InventoryViewModel @Inject constructor(
 
     /**
      * Handles both creating and updating menu items with Cloud Sync.
+     * Updated: Aligned with Dynamic Pricing JSON
      */
-    fun saveMenuItem(
-        id: Int?,
-        categoryId: Int,
-        name: String,
-        price: Double,
-        isShot: Boolean,
-        stock: Int,
-        description: String,
-        iconName: String,
-        hhPrice: Double? = null,
-        bucketPrice: Double? = null,
-        hhBucketPrice: Double? = null
-    ) {
+    fun saveMenuItem(item: MenuItem) {
         viewModelScope.launch(Dispatchers.IO) {
             // High-precision audit of the save/update event
             val actionTime: Instant = Clock.System.now()
-            Log.d("InventoryViewModel", "Saving menu item '$name' with icon '$iconName' at $actionTime")
+            Log.d("InventoryViewModel", "Saving menu item '${item.name}' with icon '${item.iconName}' at $actionTime")
 
-            val item = MenuItem(
-                id = id ?: 0,
-                categoryId = categoryId,
-                name = name,
-                price = price,
-                description = description,
-                iconName = iconName,
-                isShotWallItem = isShot,
-                inventoryCount = stock,
-                hhPrice = hhPrice,
-                bucketPrice = bucketPrice,
-                hhBucketPrice = hhBucketPrice,
-                isSynced = false // Set to false; repository will update upon successful cloud write
-            )
-            
             posRepository.saveMenuItem(item)
-            _events.emit(if (item.id != 0) "Item Updated: $name" else "Item Created: $name")
+            _events.emit(if (item.id != 0) "Item Updated: ${item.name}" else "Item Created: ${item.name}")
         }
     }
 

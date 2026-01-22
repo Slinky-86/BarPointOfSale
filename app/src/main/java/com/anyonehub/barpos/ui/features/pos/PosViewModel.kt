@@ -149,6 +149,17 @@ class PosViewModel @Inject constructor(
     fun selectCategory(category: Category?) { _selectedCategory.value = category }
 
     /**
+     * PRO PRODUCTION FEATURE: Quick jump to a specific group by name.
+     */
+    fun jumpToGroup(name: String) {
+        val groups = menuGroups.value
+        val target = groups.find { it.name.equals(name, ignoreCase = true) }
+        if (target != null) {
+            selectMenuGroup(target)
+        }
+    }
+
+    /**
      * Resolves the cloud storage URL for a specific product photo.
      */
     fun getItemImageUrl(itemName: String): String {
@@ -175,7 +186,7 @@ class PosViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Lazily, 0.0)
 
     val currentGrandTotal: StateFlow<Double> = combine(currentTabItems, appSettings) { items, settings ->
-        val data = items.keys.map { it.priceAtTimeOfSale to it.quantity }
+        val data = items.map { Triple(it.key.priceAtTimeOfSale, it.key.quantity, it.value.isFood) }
         val result = PricingEngine.calculateFullTransaction(data, settings)
         result.total
     }.stateIn(viewModelScope, SharingStarted.Lazily, 0.0)
@@ -218,7 +229,7 @@ class PosViewModel @Inject constructor(
         }
     }
 
-    fun closeTab() {
+    fun closeTab(paymentType: String = "CASH") {
         viewModelScope.launch {
             val id = _currentTabId.value
             val activeTab = currentActiveTab.value
@@ -233,7 +244,7 @@ class PosViewModel @Inject constructor(
                 val sale = Sale(
                     totalAmount = total, 
                     taxAmount = total - subtotal, 
-                    paymentType = "TAB_SETTLED", 
+                    paymentType = paymentType,
                     customerName = activeTab.customerName, 
                     serverId = activeTab.serverId,
                     timestamp = now
@@ -281,11 +292,27 @@ class PosViewModel @Inject constructor(
             repository.updatePrice(-1, newPrice) 
         } 
     }
+
+    /**
+     * PRO PRODUCTION FEATURE: Drink Mixology Builder
+     * Combines multiple choices into a single line-item note.
+     */
+    fun addMixerDrinkToTab(baseItem: MenuItem, modifiers: List<MenuItem>) {
+        val combinedNote = modifiers.joinToString(" • ") { it.name }
+        addToTab(baseItem, label = combinedNote)
+    }
+
     fun restockItem(itemId: Int, count: Int) { viewModelScope.launch { repository.updateStock(itemId, count) } }
     fun deleteMenuItem(id: Int) { viewModelScope.launch { posDao.deleteMenuItem(id) } }
     fun saveMenuItem(item: MenuItem) { viewModelScope.launch(Dispatchers.IO) { repository.saveMenuItem(item) } }
     fun addMenuGroup(name: String) { viewModelScope.launch { repository.addMenuGroup(MenuGroup(name = name)) } }
-    fun addCategory(groupId: Long, name: String, icon: String) { viewModelScope.launch { repository.addCategory(Category(menuGroupId = groupId.toInt(), name = name, iconName = icon)) } }
+    
+    fun addCategory(groupId: Long, name: String, icon: String, requiresBuilder: Boolean = false) { 
+        viewModelScope.launch { 
+            repository.addCategory(Category(menuGroupId = groupId.toInt(), name = name, iconName = icon, requiresBuilder = requiresBuilder)) 
+        } 
+    }
+
     fun updateSettings(settings: AppSetting) { viewModelScope.launch { repository.saveSettings(settings) } }
     fun updateItemSpecial(itemId: Int, price: Double?) {
         viewModelScope.launch {

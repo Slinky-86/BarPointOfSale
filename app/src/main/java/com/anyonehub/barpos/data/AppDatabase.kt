@@ -74,8 +74,6 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         private suspend fun seedDatabase(dao: PosDao) {
-            // ADMIN SEED REMOVED - Admin is now detected by email during registration
-            
             // APP SETTINGS
             dao.saveSettings(
                 AppSetting(
@@ -99,9 +97,14 @@ abstract class AppDatabase : RoomDatabase() {
             dao.insertCategory(Category(id = 2, menuGroupId = 1, name = "Whiskey", iconName = "cocktail", displayOrder = 2))
             dao.insertCategory(Category(id = 3, menuGroupId = 1, name = "Tequila", iconName = "cocktail", displayOrder = 3))
             dao.insertCategory(Category(id = 4, menuGroupId = 1, name = "Rum", iconName = "cocktail", displayOrder = 4))
+            dao.insertCategory(Category(id = 13, menuGroupId = 1, name = "Specialty Drinks", iconName = "cocktail", displayOrder = 5, requiresBuilder = true))
+            
             dao.insertCategory(Category(id = 5, menuGroupId = 2, name = "Beer Menu", iconName = "beer", displayOrder = 1))
             dao.insertCategory(Category(id = 8, menuGroupId = 3, name = "Wine", iconName = "wine", displayOrder = 1))
-            dao.insertCategory(Category(id = 10, menuGroupId = 4, name = "Food", iconName = "food", displayOrder = 1))
+            
+            dao.insertCategory(Category(id = 10, menuGroupId = 4, name = "Main Menu", iconName = "food", displayOrder = 1))
+            dao.insertCategory(Category(id = 11, menuGroupId = 4, name = "Appetizers", iconName = "food", displayOrder = 0))
+            
             dao.insertCategory(Category(id = 12, menuGroupId = 5, name = "Shot Wall", iconName = "shot", displayOrder = 1))
 
             // MENU ITEMS - VODKA
@@ -124,6 +127,11 @@ abstract class AppDatabase : RoomDatabase() {
                 dao.insertMenuItem(MenuItem(categoryId = 4, name = it, price = 0.0))
             }
 
+            // MENU ITEMS - SPECIALTY DRINKS (ALCOHOL BASES)
+            listOf("Hendrick's Gin", "Bombay Sapphire", "Woodford Reserve", "Patron Anejo", "Grey Goose VX").forEach {
+                dao.insertMenuItem(MenuItem(categoryId = 13, name = it, price = 12.0))
+            }
+
             // MENU ITEMS - BEER
             listOf(
                 "Bud Light", "Miller Lite", "Coors Light", "Mich Ultra", "Busch Light",
@@ -138,9 +146,37 @@ abstract class AppDatabase : RoomDatabase() {
                 dao.insertMenuItem(MenuItem(categoryId = 8, name = it, price = 0.0))
             }
 
+            // MENU ITEMS - APPETIZERS
+            listOf("Spinach Dip", "Fried Pickles", "Loaded Fries", "Sliders", "Quesadilla").forEach {
+                dao.insertMenuItem(MenuItem(categoryId = 11, name = it, price = 8.0, isFood = true))
+            }
+
             // MENU ITEMS - FOOD
             listOf("Wings (6)", "Wings (12)", "Nachos", "Pretzel Bites", "Mozzarella Sticks", "Classic Burger", "Cheeseburger").forEach {
-                dao.insertMenuItem(MenuItem(categoryId = 10, name = it, price = 0.0))
+                dao.insertMenuItem(MenuItem(categoryId = 10, name = it, price = 10.0, isFood = true))
+            }
+
+            // MENU ITEMS - MODIFIERS (MIXERS, GARNISH, PREP)
+            val modifiers = listOf(
+                Triple("Coke", "mixer", 0.0),
+                Triple("Sprite", "mixer", 0.0),
+                Triple("Ginger Ale", "mixer", 0.0),
+                Triple("Tonic", "mixer", 0.0),
+                Triple("Soda", "mixer", 0.0),
+                Triple("Orange Juice", "mixer", 0.50),
+                Triple("Cranberry Juice", "mixer", 0.50),
+                Triple("Pineapple Juice", "mixer", 0.50),
+                Triple("Lime", "garnish", 0.0),
+                Triple("Lemon", "garnish", 0.0),
+                Triple("Orange", "garnish", 0.0),
+                Triple("Cherry", "garnish", 0.0),
+                Triple("Olive", "garnish", 0.0),
+                Triple("Neat", "prep", 0.0),
+                Triple("Rocks", "prep", 2.0),
+                Triple("Up", "prep", 2.0)
+            )
+            modifiers.forEach { (name, type, price) ->
+                dao.insertMenuItem(MenuItem(categoryId = 13, name = name, price = price, description = type, isModifier = true))
             }
 
             // MENU ITEMS - SHOT WALL

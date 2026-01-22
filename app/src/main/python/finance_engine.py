@@ -64,19 +64,27 @@ def calculate_sale(item_json_str: str, config_json_str: str) -> str:
 def calculate_transaction(items_json_str: str, config_json_str: str) -> str:
     """
     Calculates the final totals for a tab (cashing out).
-    Ensures math is consistent with local tax rules.
+    Ensures math is consistent with local tax rules (Food ONLY).
     """
     try:
-        items = json.loads(items_json_str) # List of dicts with 'price' and 'qty'
+        items = json.loads(items_json_str) # List of dicts with 'price', 'qty', 'is_food'
         config = MenuConfig.parse_raw(config_json_str)
         
         subtotal = Money(0, USD)
+        taxable_subtotal = Money(0, USD)
+
         for item in items:
             price = item.get("price", 0.0)
             qty = item.get("qty", 1)
-            subtotal += Money(price, USD) * qty
+            is_food = item.get("is_food", False)
             
-        tax_amount = subtotal * config.taxRate
+            item_total = Money(price, USD) * qty
+            subtotal += item_total
+
+            if is_food:
+                taxable_subtotal += item_total
+
+        tax_amount = taxable_subtotal * config.taxRate
         grand_total = subtotal + tax_amount
         
         return json.dumps({

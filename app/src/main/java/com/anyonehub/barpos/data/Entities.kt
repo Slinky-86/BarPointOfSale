@@ -59,6 +59,10 @@ data class Category(
     @ColumnInfo(name = "display_order")
     @SerialName("display_order") val displayOrder: Int = 0,
     
+    @ColumnInfo(name = "requires_builder")
+    @SerialName("requires_builder")
+    val requiresBuilder: Boolean = false,
+
     @ColumnInfo(name = "is_synced")
     @Transient
     val isSynced: Boolean = false
@@ -105,21 +109,26 @@ data class MenuItem(
     @SerialName("is_active")
     val isActive: Boolean = true,
 
+    @ColumnInfo(name = "is_food")
+    @SerialName("is_food")
+    val isFood: Boolean = false,
+
+    @ColumnInfo(name = "is_modifier")
+    @SerialName("is_modifier")
+    val isModifier: Boolean = false,
+
     @ColumnInfo(name = "inventory_count")
     @SerialName("inventory_count")
     val inventoryCount: Int = 999,
 
-    @ColumnInfo(name = "hh_price")
-    @SerialName("hh_price")
-    val hhPrice: Double? = null,
-    
-    @ColumnInfo(name = "bucket_price")
-    @SerialName("bucket_price")
-    val bucketPrice: Double? = null,
-    
-    @ColumnInfo(name = "hh_bucket_price")
-    @SerialName("hh_bucket_price")
-    val hhBucketPrice: Double? = null,
+    /**
+     * DYNAMIC PRICING JSON
+     * Stores tiers as: {"Regular": 5.0, "Happy Hour": 3.0, "Mixed Drink": 7.50}
+     * This removes all hardcoded pricing logic from the database schema.
+     */
+    @ColumnInfo(name = "prices_json")
+    @SerialName("prices_json")
+    val pricesJson: String = "{}",
     
     @ColumnInfo(name = "is_synced")
     @Transient

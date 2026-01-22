@@ -25,3 +25,6 @@ __pycache__/
 
 # Log files
 *.log
+
+# Supabase sensitive files
+app/src/main/java/com/anyonehub/barpos/di/SupabaseModule.kt
