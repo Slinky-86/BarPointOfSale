@@ -70,15 +70,12 @@ class AuthViewModel @Inject constructor(
                     if (status is SessionStatus.Authenticated) {
                         val supabaseUserId = status.session.user?.id
                         if (supabaseUserId != null) {
-                            // Online-First: Check if we have this user locally, if not, fetch from cloud
                             var user = withContext(Dispatchers.IO) {
                                 posDao.getUserBySupabaseId(supabaseUserId)
                             }
                             
                             if (user == null) {
-                                // Missing from local cache (New Device scenario)
                                 try {
-                                    // Use both Admin and Normal clients in conjunction for authoritative profile recovery
                                     user = try {
                                         adminClient.postgrest[SupabaseConstants.TABLE_USERS]
                                             .select { filter { User::supabaseId eq supabaseUserId } }
@@ -110,22 +107,28 @@ class AuthViewModel @Inject constructor(
     }
 
     /**
-     * ONLINE-FIRST Login: Checks Supabase cloud identity before falling back to local.
+     * SUPABASE-FIRST Login: Checks Supabase cloud identity as the primary source of truth.
      */
     fun login(name: String, pin: String) {
         viewModelScope.launch {
             if (_loginState.value is LoginState.Loading) return@launch
             _loginState.value = LoginState.Loading
 
-            // 1. CLOUD CHECK (The New Hire Fix)
-            val cloudUser = posRepository.verifyAndSyncUser(name, pin)
+            // 1. SUPABASE CLOUD CHECK (Primary Source of Truth)
+            // This bypasses the local DB and goes directly to the cloud.
+            val cloudUser = try {
+                posRepository.verifyAndSyncUser(name, pin)
+            } catch (e: Exception) {
+                Log.e("AuthViewModel", "Supabase cloud check failed: ${e.message}")
+                null
+            }
             
-            // 2. LOCAL FALLBACK (If offline)
+            // 2. USE CLOUD USER OR FALLBACK TO LOCAL (Local is only a backup if cloud is unreachable)
             val userToAuth = cloudUser ?: withContext(Dispatchers.IO) { posDao.loginUser(name, pin) }
 
             if (userToAuth != null) {
                 try {
-                    // 3. COMPLETE AUTH (Updates Session)
+                    // 3. COMPLETE CLOUD AUTH
                     supabaseClient.auth.signInWith(Email) {
                         email = userToAuth.email
                         password = pin 
@@ -137,15 +140,14 @@ class AuthViewModel @Inject constructor(
                     _authEvents.emit(AuthEvent.NavigateToPos)
 
                 } catch (e: Exception) {
-                    // If cloud auth fails but we have a local record, allow local entry (Emergency Offline Mode)
-                    Log.w("AuthViewModel", "Cloud Auth failed, falling back to emergency offline entry: ${e.message}")
+                    Log.w("AuthViewModel", "Cloud Auth failed, attempting emergency offline entry: ${e.message}")
+                    // If we found them (via local or cloud verify) but sign-in fails, allow access if they are a known user
                     sessionManager.setCurrentUser(userToAuth)
-                    checkAvatarReminder(userToAuth)
                     _loginState.value = LoginState.Success(userToAuth)
                     _authEvents.emit(AuthEvent.NavigateToPos)
                 }
             } else {
-                _loginState.value = LoginState.Error("Invalid Name or PIN. Record not found in Cloud or Local DB.")
+                _loginState.value = LoginState.Error("Login failed. Profile not found on Supabase or Local DB. Please verify Name and PIN.")
             }
         }
     }
@@ -167,7 +169,6 @@ class AuthViewModel @Inject constructor(
                 
                 val supabaseId = userInfo?.id ?: supabaseClient.auth.currentSessionOrNull()?.user?.id
 
-                // Explicitly typed high-precision timestamp for registration audit
                 val now: Instant = Clock.System.now()
 
                 val newUser = User(

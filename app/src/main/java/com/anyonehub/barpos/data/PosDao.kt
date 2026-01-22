@@ -14,6 +14,9 @@ interface PosDao {
     @Query("SELECT * FROM users WHERE name = :name AND pin_code = :pin AND is_active = 1 LIMIT 1")
     suspend fun loginUser(name: String, pin: String): User?
 
+    @Query("SELECT * FROM users WHERE (name = :identity OR email = :identity) AND is_active = 1 LIMIT 1")
+    suspend fun getUserByIdentity(identity: String): User?
+
     @Query("SELECT * FROM users WHERE supabase_id = :supabaseId LIMIT 1")
     suspend fun getUserBySupabaseId(supabaseId: String): User?
 
